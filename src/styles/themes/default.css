@@ -1,0 +1,12 @@
+.theme-default {
+  --primary-color: #1FB8CD;
+  --secondary-color: #FFC185;
+  --background-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --surface-color: rgba(255, 255, 255, 0.95);
+  --sidebar-bg: #2C2C2E;
+  --text-white: #FFFFFF;
+  --weather-card-bg: linear-gradient(135deg, #D2B48C 0%, #CD853F 50%, #8B7355 100%);
+  --profile-card-bg: linear-gradient(135deg, #9B59B6 0%, #8E44AD 50%, #E91E63 100%);
+  --stats-card-bg: linear-gradient(135deg, #2C3E50 0%, #34495E 50%, #4A6574 100%);
+  --control-card-bg: linear-gradient(135deg, #3498DB 0%, #2980B9 50%, #1F4E79 100%);
+}

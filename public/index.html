@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Guide HAKit - Dashboard Personnalisé</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-tomorrow.min.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Header -->
+      <header class="tutorial-header">
+        <div class="header-content">
+          <h1>Guide HAKit</h1>
+          <p>Créez votre dashboard Home Assistant personnalisé</p>
+          <div class="theme-controls">
+            <button id="themeToggle" class="btn btn--secondary btn--sm">🌙 Mode Sombre</button>
+            <select id="colorScheme" class="form-control">
+              <option value="default">Thème par défaut</option>
+              <option value="warm">Thème chaleureux</option>
+              <option value="cool">Thème froid</option>
+              <option value="vibrant">Thème vibrant</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <div class="main-layout">
+        <!-- Navigation Tabs -->
+        <nav class="tutorial-nav">
+          <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="preview">🎯 Aperçu</button>
+            <button class="nav-tab" data-tab="setup">⚙️ Configuration</button>
+            <button class="nav-tab" data-tab="sidebar">📋 Sidebar</button>
+            <button class="nav-tab" data-tab="layout">📐 Layout</button>
+            <button class="nav-tab" data-tab="cards">🎴 Cartes</button>
+            <button class="nav-tab" data-tab="styling">🎨 Styling</button>
+          </div>
+        </nav>
+
+        <!-- Content Area -->
+        <main class="tutorial-content">
+          <!-- Preview Tab -->
+          <div class="tab-content active" data-content="preview">
+            <div class="preview-section">
+              <h2>Dashboard HAKit - Aperçu Final</h2>
+              <p>Voici le dashboard que nous allons créer ensemble :</p>
+
+              <div class="dashboard-demo">
+                <!-- Sidebar -->
+                <aside class="demo-sidebar">
+                  <div class="sidebar-content">
+                    <div class="sidebar-header">
+                      <span class="sidebar-logo">🏠</span>
+                    </div>
+                    <nav class="sidebar-nav">
+                      <a href="#" class="nav-item active">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                      </a>
+                      <a href="#" class="nav-item">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">Historique</span>
+                      </a>
+                      <a href="#" class="nav-item">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Analyse</span>
+                      </a>
+                      <a href="#" class="nav-item">
+                        <span class="nav-icon">🏡</span>
+                        <span class="nav-text">Maison</span>
+                      </a>
+                      <a href="#" class="nav-item">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-text">Paramètres</span>
+                      </a>
+                    </nav>
+                  </div>
+                </aside>
+
+                <!-- Main Content -->
+                <div class="demo-main">
+                  <div class="demo-grid">
+                    <!-- Weather Card -->
+                    <div class="demo-card weather-card">
+                      <div class="card-header">
+                        <h3>Weather Daily</h3>
+                        <span class="card-icon">☀️</span>
+                      </div>
+                      <div class="card-content">
+                        <div class="weather-main">
+                          <span class="temperature">22°C</span>
+                          <span class="weather-desc">Ensoleillé</span>
+                        </div>
+                        <div class="weather-details">
+                          <div class="weather-item">
+                            <span>💨 15 km/h</span>
+                          </div>
+                          <div class="weather-item">
+                            <span>💧 45%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Profile Card -->
+                    <div class="demo-card profile-card">
+                      <div class="card-header">
+                        <h3>New Forecast</h3>
+                        <span class="card-icon">👤</span>
+                      </div>
+                      <div class="card-content">
+                        <div class="profile-avatar">
+                          <div class="avatar">👤</div>
+                        </div>
+                        <div class="profile-info">
+                          <span class="profile-name">Utilisateur</span>
+                          <span class="profile-status">En ligne</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Stats Card -->
+                    <div class="demo-card stats-card">
+                      <div class="card-header">
+                        <h3>Denther Forecast</h3>
+                        <span class="card-icon">📊</span>
+                      </div>
+                      <div class="card-content">
+                        <div class="stats-grid">
+                          <div class="stat-item">
+                            <span class="stat-value">24.5°</span>
+                            <span class="stat-label">Température</span>
+                          </div>
+                          <div class="stat-item">
+                            <span class="stat-value">65%</span>
+                            <span class="stat-label">Humidité</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Control Card -->
+                    <div class="demo-card control-card">
+                      <div class="card-header">
+                        <h3>Fuen Day</h3>
+                        <span class="card-icon">🎛️</span>
+                      </div>
+                      <div class="card-content">
+                        <div class="control-buttons">
+                          <button class="control-btn active">💡 ON</button>
+                          <button class="control-btn">📺 TV</button>
+                          <button class="control-btn">🔥 Chauffage</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="preview-actions">
+                <button class="btn btn--primary" id="startTutorial">🚀 Commencer le tutoriel</button>
+                <button class="btn btn--secondary" id="copyFullCode">📋 Copier le code complet</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Setup Tab -->
+          <div class="tab-content" data-content="setup">
+            <div class="tutorial-section">
+              <h2>Configuration initiale HAKit</h2>
+              <p>Commencez par installer et configurer HAKit dans votre projet.</p>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Installation</span>
+                  <button class="copy-btn" data-code="install">📋 Copier</button>
+                </div>
+                <pre><code class="language-bash">npm install @hakit/core @hakit/components</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Configuration de base</span>
+                  <button class="copy-btn" data-code="basic-setup">📋 Copier</button>
+                </div>
+                <pre><code class="language-javascript">import { HassConnect, ThemeProvider } from '@hakit/core';
+import { Row, Column, WeatherCard } from '@hakit/components';
+
+const customTheme = {
+  colors: {
+    primary: '#1FB8CD',
+    secondary: '#FFC185',
+    background: '#2C3E50',
+    surface: '#34495E',
+    text: '#FFFFFF'
+  },
+  borderRadius: '20px',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+};
+
+function App() {
+  return (
+    &lt;HassConnect hassUrl="http://your-home-assistant-url:8123"&gt;
+      &lt;ThemeProvider theme={customTheme}&gt;
+        {/* Votre dashboard ici */}
+      &lt;/ThemeProvider&gt;
+    &lt;/HassConnect&gt;
+  );
+}</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sidebar Tab -->
+          <div class="tab-content" data-content="sidebar">
+            <div class="tutorial-section">
+              <h2>Création de la Sidebar</h2>
+              <p>Créez une navigation latérale moderne avec icônes.</p>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Composant Sidebar</span>
+                  <button class="copy-btn" data-code="sidebar">📋 Copier</button>
+                </div>
+                <pre><code class="language-javascript">&lt;SidebarCard&gt;
+  &lt;nav className="sidebar-nav"&gt;
+    &lt;a href="#dashboard" className="nav-item active"&gt;
+      &lt;span className="nav-icon"&gt;📊&lt;/span&gt;
+      &lt;span className="nav-text"&gt;Dashboard&lt;/span&gt;
+    &lt;/a&gt;
+    &lt;a href="#history" className="nav-item"&gt;
+      &lt;span className="nav-icon"&gt;📈&lt;/span&gt;
+      &lt;span className="nav-text"&gt;Historique&lt;/span&gt;
+    &lt;/a&gt;
+    &lt;a href="#analysis" className="nav-item"&gt;
+      &lt;span className="nav-icon"&gt;🔍&lt;/span&gt;
+      &lt;span className="nav-text"&gt;Analyse&lt;/span&gt;
+    &lt;/a&gt;
+    &lt;a href="#home" className="nav-item"&gt;
+      &lt;span className="nav-icon"&gt;🏡&lt;/span&gt;
+      &lt;span className="nav-text"&gt;Maison&lt;/span&gt;
+    &lt;/a&gt;
+    &lt;a href="#settings" className="nav-item"&gt;
+      &lt;span className="nav-icon"&gt;⚙️&lt;/span&gt;
+      &lt;span className="nav-text"&gt;Paramètres&lt;/span&gt;
+    &lt;/a&gt;
+  &lt;/nav&gt;
+&lt;/SidebarCard&gt;</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Styles CSS pour la Sidebar</span>
+                  <button class="copy-btn" data-code="sidebar-css">📋 Copier</button>
+                </div>
+                <pre><code class="language-css">.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background: #2C2C2E;
+  border-radius: 0 20px 20px 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: #FFFFFF;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, #1FB8CD, #32C8DC);
+}</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layout Tab -->
+          <div class="tab-content" data-content="layout">
+            <div class="tutorial-section">
+              <h2>Structure du Layout</h2>
+              <p>Organisez vos cartes avec un système de grille responsive.</p>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Layout Principal</span>
+                  <button class="copy-btn" data-code="layout">📋 Copier</button>
+                </div>
+                <pre><code class="language-javascript">&lt;Row style={{ minHeight: '100vh', gap: '0' }}&gt;
+  {/* Sidebar */}
+  &lt;Column style={{ width: '240px' }}&gt;
+    &lt;SidebarCard&gt;
+      {/* Navigation */}
+    &lt;/SidebarCard&gt;
+  &lt;/Column&gt;
+  
+  {/* Main Content */}
+  &lt;Column style={{ flex: 1, padding: '24px' }}&gt;
+    &lt;div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3, 1fr)',
+      gap: '20px',
+      height: 'fit-content'
+    }}&gt;
+      {/* Cartes ici */}
+    &lt;/div&gt;
+  &lt;/Column&gt;
+&lt;/Row&gt;</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Grid CSS Responsive</span>
+                  <button class="copy-btn" data-code="grid-css">📋 Copier</button>
+                </div>
+                <pre><code class="language-css">.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 24px;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cards Tab -->
+          <div class="tab-content" data-content="cards">
+            <div class="tutorial-section">
+              <h2>Création des Cartes</h2>
+              <p>Créez des cartes personnalisées avec des gradients et des animations.</p>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Carte Météo</span>
+                  <button class="copy-btn" data-code="weather-card">📋 Copier</button>
+                </div>
+                <pre><code class="language-javascript">&lt;WeatherCard
+  entity="weather.chancelade"
+  showForecast
+  style={{
+    background: 'linear-gradient(135deg, #D2B48C, #8B7355)',
+    borderRadius: '20px',
+    gridColumn: 'span 2',
+    padding: '24px',
+    color: '#FFFFFF',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+  }}
+/&gt;</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Carte Profil</span>
+                  <button class="copy-btn" data-code="profile-card">📋 Copier</button>
+                </div>
+                <pre><code class="language-javascript">&lt;ButtonCard
+  entity="person.user"
+  style={{
+    background: 'linear-gradient(135deg, #9B59B6, #E91E63)',
+    borderRadius: '20px',
+    padding: '24px',
+    color: '#FFFFFF',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+  }}
+&gt;
+  &lt;div className="profile-content"&gt;
+    &lt;h3&gt;New Forecast&lt;/h3&gt;
+    &lt;div className="profile-avatar"&gt;👤&lt;/div&gt;
+    &lt;span&gt;Utilisateur connecté&lt;/span&gt;
+  &lt;/div&gt;
+&lt;/ButtonCard&gt;</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Carte Statistiques</span>
+                  <button class="copy-btn" data-code="stats-card">📋 Copier</button>
+                </div>
+                <pre><code class="language-javascript">&lt;div style={{
+  background: 'linear-gradient(135deg, #2C3E50, #34495E)',
+  borderRadius: '20px',
+  padding: '24px',
+  gridColumn: 'span 2',
+  color: '#FFFFFF',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+}}&gt;
+  &lt;h3&gt;Denther Forecast&lt;/h3&gt;
+  &lt;div style={{
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+    marginTop: '16px'
+  }}&gt;
+    &lt;div className="stat-item"&gt;
+      &lt;span className="stat-value"&gt;24.5°&lt;/span&gt;
+      &lt;span className="stat-label"&gt;Température&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div className="stat-item"&gt;
+      &lt;span className="stat-value"&gt;65%&lt;/span&gt;
+      &lt;span className="stat-label"&gt;Humidité&lt;/span&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Styling Tab -->
+          <div class="tab-content" data-content="styling">
+            <div class="tutorial-section">
+              <h2>Personnalisation Avancée</h2>
+              <p>Ajoutez des animations et personnalisez l'apparence.</p>
+
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Animations CSS</span>
+                  <button class="copy-btn" data-code="animations">📋 Copier</button>
+                </div>
+                <pre><code class="language-css">.demo-card {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.demo-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.demo-card {
+  animation: fadeInUp 0.6s ease-out;
+}</code></pre>
+              </div>
+
+              <div class="color-controls">
+                <h3>Testez différents thèmes :</h3>
+                <div class="theme-buttons">
+                  <button class="theme-btn" data-theme="default">🎨 Par défaut</button>
+                  <button class="theme-btn" data-theme="warm">🔥 Chaleureux</button>
+                  <button class="theme-btn" data-theme="cool">❄️ Froid</button>
+                  <button class="theme-btn" data-theme="vibrant">🌈 Vibrant</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- Copy notification -->
+      <div id="copyNotification" class="copy-notification hidden">✅ Code copié dans le presse-papier !</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,388 @@
+// Hook temps réel corrigé - Anti re-render boucle + WebSocket stabilisé
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useHomeAssistantWebSocket } from './useHomeAssistantWebSocket';
+
+// ✅ Interfaces inchangées
+export interface EntityData {
+  entity_id: string;
+  state: string;
+  attributes: Record<string, any>;
+  domain: string;
+  friendly_name: string;
+  last_changed: string;
+  last_updated: string;
+}
+
+export interface UseAllEntitiesReturn {
+  entities: EntityData[];
+  entitiesByDomain: Record<string, EntityData[]>;
+  loading: boolean;
+  error: string | null;
+  refreshEntities: () => void;
+  // États WebSocket
+  wsConnected: boolean;
+  wsConnecting: boolean;
+  wsError: string | null;
+  wsMessageCount: number;
+  realtimeUpdates: number;
+  lastUpdate: Date | null;
+  // ✅ Nouveaux états diagnostic
+  wsConnectionAttempts: number;
+  wsPermanentlyDisabled: boolean;
+}
+
+const HA_URL = 'http://192.168.0.42:8123';
+const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI2OTdkMjg4NzIyYTc0NGI0OWZlY2Y2ZTI5YmI2OTI1YyIsImlhdCI6MTc1NTIwODE3NCwiZXhwIjoyMDcwNTY4MTc0fQ.bBBHijZ0RdzRvALatqdHb-zdBpHwCA-i801Kp3fGjoU';
+
+export const useAllEntities = (): UseAllEntitiesReturn => {
+  const [entities, setEntities] = useState<EntityData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [realtimeUpdates, setRealtimeUpdates] = useState(0);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  
+  // ✅ Refs pour éviter les re-renders
+  const isInitialLoadRef = useRef(true);
+  const entitiesMapRef = useRef<Map<string, EntityData>>(new Map());
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ✅ Hook WebSocket corrigé
+  const {
+    connected: wsConnected,
+    connecting: wsConnecting,
+    error: wsError,
+    messageCount: wsMessageCount,
+    connectionAttempts: wsConnectionAttempts,
+    permanentlyDisabled: wsPermanentlyDisabled,
+    subscribe,
+    getStates,
+    callService,
+    resetCircuitBreaker
+  } = useHomeAssistantWebSocket();
+
+  // ✅ Conversion optimisée avec mise en cache
+  const convertToEntityData = useCallback((rawState: any): EntityData => {
+    return {
+      entity_id: rawState.entity_id,
+      state: rawState.state,
+      attributes: rawState.attributes || {},
+      domain: rawState.entity_id.split('.')[0],
+      friendly_name: rawState.attributes?.friendly_name || rawState.entity_id,
+      last_changed: rawState.last_changed,
+      last_updated: rawState.last_updated
+    };
+  }, []);
+
+  // ✅ Chargement initial optimisé
+  const fetchEntities = useCallback(async (forceRefresh: boolean = false) => {
+    // Éviter les appels multiples pendant le chargement
+    if (loading && !forceRefresh) {
+      console.log('⏸️ Chargement déjà en cours, skipping...');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      let states;
+
+      // Priorité WebSocket si connecté
+      if (wsConnected) {
+        console.log('🔗 Récupération entités via WebSocket');
+        states = await getStates();
+      } else {
+        // Fallback API REST
+        console.log('📡 Récupération entités via API REST');
+        const response = await fetch(`${HA_URL}/api/states`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${HA_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        states = await response.json();
+      }
+
+      // ✅ Conversion et mise en cache optimisée
+      const newEntitiesMap = new Map<string, EntityData>();
+      const entityData: EntityData[] = [];
+
+      states.forEach((state: any) => {
+        const entity = convertToEntityData(state);
+        newEntitiesMap.set(entity.entity_id, entity);
+        entityData.push(entity);
+      });
+
+      // Mise à jour atomique
+      entitiesMapRef.current = newEntitiesMap;
+      setEntities(entityData);
+      setLastUpdate(new Date());
+      isInitialLoadRef.current = false;
+      
+      const source = wsConnected ? 'WebSocket' : 'API REST';
+      console.log(`✅ ${source}: ${entityData.length} entités chargées${forceRefresh ? ' (refresh forcé)' : ''}`);
+      
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch entities';
+      setError(errorMsg);
+      console.error('❌ Erreur récupération entités:', err);
+      
+      // En cas d'erreur WebSocket, réinitialiser le circuit breaker après un délai
+      if (wsConnected && errorMsg.includes('WebSocket')) {
+        setTimeout(() => {
+          console.log('🔄 Reset circuit breaker après erreur');
+          resetCircuitBreaker();
+        }, 10000);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [wsConnected, getStates, convertToEntityData, loading, resetCircuitBreaker]);
+
+  // ✅ Gestion des mises à jour temps réel optimisée
+  useEffect(() => {
+    if (!wsConnected || isInitialLoadRef.current) return;
+
+    console.log('👂 Activation écoute changements temps réel');
+
+    const unsubscribe = subscribe('state_changed', (eventData) => {
+      const { entity_id, new_state, old_state } = eventData.data;
+      
+      if (!new_state) {
+        // Entité supprimée
+        setEntities(prev => {
+          const filtered = prev.filter(entity => entity.entity_id !== entity_id);
+          // Mettre à jour la map aussi
+          entitiesMapRef.current.delete(entity_id);
+          console.log(`🗑️ Entité supprimée: ${entity_id}`);
+          return filtered;
+        });
+      } else {
+        // Entité mise à jour ou ajoutée
+        const updatedEntity = convertToEntityData(new_state);
+        
+        // Vérifier si c'est vraiment un changement
+        const currentEntity = entitiesMapRef.current.get(entity_id);
+        const hasStateChanged = !currentEntity || 
+          currentEntity.state !== updatedEntity.state ||
+          currentEntity.last_updated !== updatedEntity.last_updated;
+
+        if (hasStateChanged) {
+          setEntities(prev => {
+            const existingIndex = prev.findIndex(entity => entity.entity_id === entity_id);
+            
+            if (existingIndex >= 0) {
+              // Mise à jour entité existante
+              const newEntities = [...prev];
+              newEntities[existingIndex] = updatedEntity;
+              entitiesMapRef.current.set(entity_id, updatedEntity);
+              return newEntities;
+            } else {
+              // Nouvelle entité
+              entitiesMapRef.current.set(entity_id, updatedEntity);
+              return [...prev, updatedEntity];
+            }
+          });
+
+          setRealtimeUpdates(prev => prev + 1);
+          setLastUpdate(new Date());
+          
+          // Log des changements importants (éviter spam)
+          if (old_state?.state !== new_state.state) {
+            console.log(`🔄 ${entity_id}: ${old_state?.state} → ${new_state.state}`);
+          }
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [wsConnected, subscribe, convertToEntityData]);
+
+  // ✅ Chargement initial avec délai pour éviter les appels multiples
+  useEffect(() => {
+    if (isInitialLoadRef.current) {
+      const delay = setTimeout(() => {
+        fetchEntities();
+      }, 500); // Délai pour stabiliser les hooks
+
+      return () => clearTimeout(delay);
+    }
+  }, [fetchEntities]);
+
+  // ✅ Polling de fallback intelligent
+  useEffect(() => {
+    // Nettoyer l'ancien interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    // Activer polling seulement si WebSocket indisponible ET pas en mode permanently disabled
+    if (!wsConnected && !wsConnecting && !wsPermanentlyDisabled && !isInitialLoadRef.current) {
+      console.log('⏰ Mode polling activé (WebSocket indisponible)');
+      
+      pollingIntervalRef.current = setInterval(() => {
+        if (!wsConnected && !loading) {
+          fetchEntities();
+        }
+      }, 30000); // Polling 30s
+
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      };
+    }
+  }, [wsConnected, wsConnecting, wsPermanentlyDisabled, fetchEntities, loading]);
+
+  // ✅ Groupement par domaine avec useMemo pour éviter re-calculs
+  const entitiesByDomain = useMemo(() => {
+    return entities.reduce((acc, entity) => {
+      if (!acc[entity.domain]) {
+        acc[entity.domain] = [];
+      }
+      acc[entity.domain].push(entity);
+      return acc;
+    }, {} as Record<string, EntityData[]>);
+  }, [entities]);
+
+  // ✅ Fonction de refresh avec anti-spam
+  const refreshEntities = useCallback(() => {
+    console.log('🔄 Refresh manuel demandé');
+    if (!loading) {
+      fetchEntities(true);
+    } else {
+      console.log('⏸️ Refresh ignoré - chargement en cours');
+    }
+  }, [fetchEntities, loading]);
+
+  // Nettoyage au démontage
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  return {
+    entities,
+    entitiesByDomain,
+    loading,
+    error,
+    refreshEntities,
+    // États WebSocket
+    wsConnected,
+    wsConnecting,
+    wsError,
+    wsMessageCount,
+    realtimeUpdates,
+    lastUpdate,
+    wsConnectionAttempts,
+    wsPermanentlyDisabled
+  };
+};
+
+// ✅ Hook filtré inchangé
+export const useFilteredEntities = (
+  filter?: {
+    domains?: string[];
+    includeHidden?: boolean;
+    includeDisabled?: boolean;
+    searchTerm?: string;
+  }
+) => {
+  const { entities, loading, error } = useAllEntities();
+
+  const filteredEntities = useMemo(() => {
+    return entities.filter(entity => {
+      if (filter?.domains && !filter.domains.includes(entity.domain)) {
+        return false;
+      }
+      if (!filter?.includeHidden && entity.attributes.hidden) {
+        return false;
+      }
+      if (!filter?.includeDisabled && entity.attributes.disabled) {
+        return false;
+      }
+      if (filter?.searchTerm) {
+        const searchLower = filter.searchTerm.toLowerCase();
+        return (
+          entity.entity_id.toLowerCase().includes(searchLower) ||
+          entity.friendly_name.toLowerCase().includes(searchLower)
+        );
+      }
+      return true;
+    });
+  }, [entities, filter]);
+
+  return {
+    entities: filteredEntities,
+    loading,
+    error
+  };
+};
+
+// ✅ Service contrôle entités avec WebSocket + fallback
+export const useEntityControl = () => {
+  const { wsConnected, callService: wsCallService } = useHomeAssistantWebSocket();
+
+  const callService = useCallback(async (domain: string, service: string, entity_id: string, service_data?: any) => {
+    try {
+      // Priorité WebSocket si connecté
+      if (wsConnected) {
+        console.log(`🔗 Service ${domain}.${service} via WebSocket pour ${entity_id}`);
+        return await wsCallService(domain, service, {
+          entity_id,
+          ...service_data
+        });
+      } else {
+        // Fallback API REST
+        console.log(`📡 Service ${domain}.${service} via API REST pour ${entity_id}`);
+        const response = await fetch(`${HA_URL}/api/services/${domain}/${service}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${HA_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            entity_id,
+            ...service_data
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Service call failed: ${response.status}`);
+        }
+
+        return await response.json();
+      }
+    } catch (err) {
+      console.error(`❌ Erreur service ${domain}.${service}:`, err);
+      throw err;
+    }
+  }, [wsConnected, wsCallService]);
+
+  return {
+    turnOn: (entity_id: string) => {
+      const domain = entity_id.split('.')[0];
+      return callService(domain, 'turn_on', entity_id);
+    },
+    turnOff: (entity_id: string) => {
+      const domain = entity_id.split('.')[0];
+      return callService(domain, 'turn_off', entity_id);
+    },
+    toggle: (entity_id: string) => {
+      const domain = entity_id.split('.')[0];
+      return callService(domain, 'toggle', entity_id);
+    },
+    callService
+  };
+};

@@ -1,0 +1,45 @@
+import React from 'react';
+import { HassConnect, ThemeProvider } from '@hakit/core';
+import './App.css';
+
+// Import des composants Layout
+import Sidebar from './components/Layout/Sidebar';
+import MainContent from './components/Layout/MainContent';
+
+// Import de la configuration et des hooks
+import { modernTheme } from './config/theme';
+import { ThemeProvider as CustomThemeProvider } from './hooks/useTheme';
+import { useResponsive } from './hooks/useResponsive';
+
+// Import des styles des thèmes
+import './styles/themes/default.css';
+import './styles/themes/dark.css';
+import './styles/themes/modern.css';
+import './styles/components/navigation.css';
+
+// Composant principal avec gestion responsive
+function AppContent() {
+  const { isMobile, isSmallScreen } = useResponsive();
+
+  return (
+    <div className={`dashboard-container ${isMobile ? 'mobile' : ''} ${isSmallScreen ? 'small-screen' : ''}`}>
+      <Sidebar />
+      <MainContent />
+    </div>
+  );
+}
+
+// Composant App principal
+function App() {
+  return (
+    <HassConnect hassUrl='http://192.168.0.42:8123'>
+      <ThemeProvider theme={modernTheme}>
+        <CustomThemeProvider defaultTheme='default'>
+          <AppContent />
+        </CustomThemeProvider>
+      </ThemeProvider>
+    </HassConnect>
+  );
+}
+
+export default App;

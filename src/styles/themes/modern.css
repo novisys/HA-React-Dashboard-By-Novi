@@ -1,0 +1,9 @@
+.theme-modern {
+  --primary-color: #6366F1;
+  --secondary-color: #F59E0B;
+  --background-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  --surface-color: rgba(255, 255, 255, 0.1);
+  --sidebar-bg: rgba(30, 30, 30, 0.8);
+  --backdrop-filter: blur(20px);
+  --weather-card-bg: linear-gradient(135deg, rgba(210, 180, 140, 0.9) 0%, rgba(205, 133, 63, 0.9) 50%, rgba(139, 115, 85, 0.9) 100%);
+}

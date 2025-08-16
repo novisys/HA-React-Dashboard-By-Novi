@@ -1,0 +1,38 @@
+.base-card {
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  color: white;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.base-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.weather-card-large {
+  background: linear-gradient(135deg, #D2B48C 0%, #CD853F 50%, #8B7355 100%);
+  grid-column: span 2;
+  min-height: 280px;
+}
+
+.profile-card {
+  background: linear-gradient(135deg, #9B59B6 0%, #8E44AD 50%, #E91E63 100%);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-card {
+  background: linear-gradient(135deg, #2C3E50 0%, #34495E 50%, #4A6574 100%);
+  grid-column: span 2;
+}
+
+.control-card {
+  background: linear-gradient(135deg, #3498DB 0%, #2980B9 50%, #1F4E79 100%);
+  min-height: 200px;
+}

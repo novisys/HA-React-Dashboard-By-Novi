@@ -1,0 +1,188 @@
+// Hook pour récupérer toutes les entités via API REST Home Assistant
+import { useState, useEffect, useCallback } from 'react';
+
+// ✅ EXPORT des interfaces
+export interface EntityData {
+  entity_id: string;
+  state: string;
+  attributes: Record<string, any>;
+  domain: string;
+  friendly_name: string;
+  last_changed: string;
+  last_updated: string;
+}
+
+export interface UseAllEntitiesReturn {
+  entities: EntityData[];
+  entitiesByDomain: Record<string, EntityData[]>;
+  loading: boolean;
+  error: string | null;
+  refreshEntities: () => void;
+}
+
+const HA_URL = 'http://192.168.0.42:8123';
+const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI2OTdkMjg4NzIyYTc0NGI0OWZlY2Y2ZTI5YmI2OTI1YyIsImlhdCI6MTc1NTIwODE3NCwiZXhwIjoyMDcwNTY4MTc0fQ.bBBHijZ0RdzRvALatqdHb-zdBpHwCA-i801Kp3fGjoU';
+
+export const useAllEntities = (): UseAllEntitiesReturn => {
+  const [entities, setEntities] = useState<EntityData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEntities = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${HA_URL}/api/states`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const states = await response.json();
+      
+      const entityData: EntityData[] = states.map((state: any) => ({
+        entity_id: state.entity_id,
+        state: state.state,
+        attributes: state.attributes,
+        domain: state.entity_id.split('.')[0],
+        friendly_name: state.attributes.friendly_name || state.entity_id,
+        last_changed: state.last_changed,
+        last_updated: state.last_updated
+      }));
+
+      setEntities(entityData);
+      console.log(`✅ API REST: ${entityData.length} entités Home Assistant chargées`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch entities');
+      console.error('❌ Erreur récupération entités:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEntities();
+    
+    // Rafraîchissement automatique toutes les 30 secondes
+    const interval = setInterval(fetchEntities, 30000);
+    return () => clearInterval(interval);
+  }, [fetchEntities]);
+
+  // Grouper les entités par domaine
+  const entitiesByDomain = entities.reduce((acc, entity) => {
+    if (!acc[entity.domain]) {
+      acc[entity.domain] = [];
+    }
+    acc[entity.domain].push(entity);
+    return acc;
+  }, {} as Record<string, EntityData[]>);
+
+  return {
+    entities,
+    entitiesByDomain,
+    loading,
+    error,
+    refreshEntities: fetchEntities
+  };
+};
+
+// Hook pour filtrer les entités par domaine ou critères spécifiques
+export const useFilteredEntities = (
+  filter?: {
+    domains?: string[];
+    includeHidden?: boolean;
+    includeDisabled?: boolean;
+    searchTerm?: string;
+  }
+) => {
+  const { entities, loading, error } = useAllEntities();
+
+  const filteredEntities = entities.filter(entity => {
+    // Filtrer par domaine
+    if (filter?.domains && !filter.domains.includes(entity.domain)) {
+      return false;
+    }
+
+    // Filtrer les entités cachées
+    if (!filter?.includeHidden && entity.attributes.hidden) {
+      return false;
+    }
+
+    // Filtrer les entités désactivées
+    if (!filter?.includeDisabled && entity.attributes.disabled) {
+      return false;
+    }
+
+    // Filtrer par terme de recherche
+    if (filter?.searchTerm) {
+      const searchLower = filter.searchTerm.toLowerCase();
+      return (
+        entity.entity_id.toLowerCase().includes(searchLower) ||
+        entity.friendly_name.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return true;
+  });
+
+  return {
+    entities: filteredEntities,
+    loading,
+    error
+  };
+};
+
+// ✅ EXPORT Service pour contrôler les entités (lumières, switches, etc.)
+export const useEntityControl = () => {
+  const callService = async (domain: string, service: string, entity_id: string, service_data?: any) => {
+    try {
+      const response = await fetch(`${HA_URL}/api/services/${domain}/${service}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          entity_id,
+          ...service_data
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Service call failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Service ${domain}.${service} appelé pour ${entity_id}`);
+      return result;
+    } catch (err) {
+      console.error(`❌ Erreur service ${domain}.${service}:`, err);
+      throw err;
+    }
+  };
+
+  return {
+    // Actions communes
+    turnOn: (entity_id: string) => {
+      const domain = entity_id.split('.')[0];
+      return callService(domain, 'turn_on', entity_id);
+    },
+    turnOff: (entity_id: string) => {
+      const domain = entity_id.split('.');
+      return callService(domain, 'turn_off', entity_id);
+    },
+    toggle: (entity_id: string) => {
+      const domain = entity_id.split('.');
+      return callService(domain, 'toggle', entity_id);
+    },
+    // Service générique
+    callService
+  };
+};

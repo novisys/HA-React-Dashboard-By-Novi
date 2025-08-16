@@ -1,0 +1,536 @@
+// Grille de dashboard avec drag & drop utilisant @dnd-kit
+import React, { useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent, // ✅ Importation corrigée
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { useDashboardLayout, type WidgetConfig } from '../../hooks/useDashboardLayout';
+import { useAllEntities } from '../../hooks/useAllEntities';
+import { DraggableWidget } from '../DraggableWidget';
+import { WidgetSelector, WidgetConfigModal } from '../WidgetComponents';
+
+interface DashboardGridProps {
+  dashboardId?: string;
+  className?: string;
+}
+
+export const DashboardGrid: React.FC<DashboardGridProps> = ({ 
+  dashboardId = 'main-dashboard',
+  className = ''
+}) => {
+  const {
+    layout,
+    isEditing,
+    setIsEditing,
+    selectedWidget,
+    setSelectedWidget,
+    updateWidgetPosition,
+    updateWidgetConfig,
+    addWidget,
+    removeWidget,
+    resetLayout,
+    exportLayout,
+    importLayout
+  } = useDashboardLayout(dashboardId);
+
+  const { entities, entitiesByDomain, loading, error, refreshEntities } = useAllEntities();
+
+  const [showWidgetSelector, setShowWidgetSelector] = useState(false);
+  const [editingWidget, setEditingWidget] = useState<WidgetConfig | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = layout.widgets.findIndex((widget) => widget.id === active.id);
+      const newIndex = layout.widgets.findIndex((widget) => widget.id === over.id);
+      
+      const reorderedWidgets = arrayMove(layout.widgets, oldIndex, newIndex);
+      
+      // Mettre à jour les positions des widgets
+      reorderedWidgets.forEach((widget, index) => {
+        const newPosition = calculateGridPosition(index, layout.gridCols);
+        updateWidgetPosition(widget.id, newPosition);
+      });
+    }
+  };
+
+  const handleAddWidget = (widgetTemplate: Partial<WidgetConfig>) => {
+    const newPosition = findNextAvailablePosition();
+    addWidget({
+      ...widgetTemplate,
+      position: newPosition,
+      size: widgetTemplate.size || { width: 1, height: 1 },
+      config: widgetTemplate.config || {},
+      visible: true
+    } as Omit<WidgetConfig, 'id'>);
+    setShowWidgetSelector(false);
+  };
+
+  const handleWidgetEdit = (widget: WidgetConfig) => {
+    setEditingWidget(widget);
+  };
+
+  const handleWidgetSave = (updatedWidget: WidgetConfig) => {
+    updateWidgetConfig(updatedWidget.id, updatedWidget);
+    setEditingWidget(null);
+  };
+
+  const handleTitleEdit = (widgetId: string, newTitle: string) => {
+    updateWidgetConfig(widgetId, { title: newTitle });
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      importLayout(file)
+        .then(() => {
+          alert('Layout importé avec succès !');
+        })
+        .catch((error) => {
+          alert(`Erreur lors de l'import: ${error.message}`);
+        });
+    }
+  };
+
+  const findNextAvailablePosition = () => {
+    const occupiedPositions = layout.widgets.map(w => ({ x: w.position.x, y: w.position.y }));
+    
+    for (let y = 0; y < layout.gridRows; y++) {
+      for (let x = 0; x < layout.gridCols; x++) {
+        const isOccupied = occupiedPositions.some(pos => pos.x === x && pos.y === y);
+        if (!isOccupied) {
+          return { x, y };
+        }
+      }
+    }
+    
+    // Si aucune position libre, ajouter en bas
+    return { x: 0, y: layout.gridRows };
+  };
+
+  const calculateGridPosition = (index: number, cols: number) => {
+    return {
+      x: index % cols,
+      y: Math.floor(index / cols)
+    };
+  };
+
+  if (loading) {
+    return (
+      <div className="dashboard-loading">
+        <div className="loading-spinner"></div>
+        <p>Chargement de vos entités Home Assistant...</p>
+        <style jsx>{getLoadingStyles()}</style>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard-error">
+        <h2>❌ Erreur de connexion</h2>
+        <p>{error}</p>
+        <button onClick={refreshEntities} className="retry-btn">
+          🔄 Réessayer
+        </button>
+        <style jsx>{getErrorStyles()}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`dashboard-grid ${className}`}>
+      {/* Barre d'outils */}
+      <div className="dashboard-toolbar">
+        <div className="toolbar-left">
+          <h1 className="dashboard-title">🏠 Dashboard Home Assistant</h1>
+          <div className="dashboard-stats">
+            <span className="stat">{entities.length} entités</span>
+            <span className="stat">{layout.widgets.length} widgets</span>
+            <span className="stat">{Object.keys(entitiesByDomain).length} domaines</span>
+          </div>
+        </div>
+        
+        <div className="toolbar-right">
+          <button
+            className={`toolbar-btn ${isEditing ? 'active' : ''}`}
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            {isEditing ? '✓ Mode Normal' : '✏️ Mode Édition'}
+          </button>
+          
+          {isEditing && (
+            <>
+              <button
+                className="toolbar-btn add"
+                onClick={() => setShowWidgetSelector(true)}
+              >
+                ➕ Ajouter Widget
+              </button>
+              
+              <button
+                className="toolbar-btn"
+                onClick={exportLayout}
+                title="Exporter le layout"
+              >
+                📤 Exporter
+              </button>
+              
+              <label className="toolbar-btn file-input">
+                📥 Importer
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileImport}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              
+              <button
+                className="toolbar-btn danger"
+                onClick={() => {
+                  if (confirm('Réinitialiser le dashboard ?')) {
+                    resetLayout();
+                  }
+                }}
+                title="Réinitialiser"
+              >
+                🔄 Reset
+              </button>
+            </>
+          )}
+          
+          <button
+            className="toolbar-btn"
+            onClick={refreshEntities}
+            title="Actualiser les entités"
+          >
+            🔄 Actualiser
+          </button>
+        </div>
+      </div>
+
+      {/* Zone de widgets vide */}
+      {layout.widgets.length === 0 && (
+        <div className="empty-dashboard">
+          <div className="empty-content">
+            <div className="empty-icon">🎨</div>
+            <h2>Dashboard vide</h2>
+            <p>Commencez par ajouter votre premier widget !</p>
+            <button
+              className="add-first-widget-btn"
+              onClick={() => setShowWidgetSelector(true)}
+            >
+              ➕ Ajouter mon premier widget
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Grille de widgets avec drag & drop */}
+      {layout.widgets.length > 0 && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={layout.widgets.map(w => w.id)}
+            strategy={rectSortingStrategy}
+          >
+            <div className="widgets-grid">
+              {layout.widgets
+                .filter(widget => widget.visible || isEditing)
+                .map(widget => {
+                  const entityData = widget.entity_id 
+                    ? entities.find(e => e.entity_id === widget.entity_id)
+                    : undefined;
+
+                  return (
+                    <DraggableWidget
+                      key={widget.id}
+                      widget={widget}
+                      entityData={entityData}
+                      allEntities={entities}
+                      isEditing={isEditing}
+                      onEdit={handleWidgetEdit}
+                      onDelete={removeWidget}
+                      onTitleEdit={handleTitleEdit}
+                    />
+                  );
+                })
+              }
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {/* Sélecteur de widgets */}
+      {showWidgetSelector && (
+        <WidgetSelector
+          entities={entities}
+          entitiesByDomain={entitiesByDomain}
+          onSelectWidget={handleAddWidget}
+          onClose={() => setShowWidgetSelector(false)}
+        />
+      )}
+
+      {/* Modal de configuration */}
+      {editingWidget && (
+        <WidgetConfigModal
+          widget={editingWidget}
+          entities={entities}
+          entitiesByDomain={entitiesByDomain}
+          onSave={handleWidgetSave}
+          onClose={() => setEditingWidget(null)}
+        />
+      )}
+
+      <style jsx>{getDashboardStyles()}</style>
+    </div>
+  );
+};
+
+function getLoadingStyles() {
+  return `
+    .dashboard-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 400px;
+      color: #666;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #1fb8cd;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
+}
+
+function getErrorStyles() {
+  return `
+    .dashboard-error {
+      padding: 40px;
+      text-align: center;
+      color: #dc3545;
+    }
+    
+    .retry-btn {
+      background: #1fb8cd;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+  `;
+}
+
+function getDashboardStyles() {
+  return `
+    .dashboard-grid {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #f5f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .dashboard-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .dashboard-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      color: #1d1d1f;
+    }
+
+    .dashboard-stats {
+      display: flex;
+      gap: 16px;
+    }
+
+    .stat {
+      background: #f8f9fa;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+
+    .toolbar-right {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .toolbar-btn {
+      background: #1fb8cd;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .toolbar-btn:hover {
+      background: #1aa3b8;
+      transform: translateY(-1px);
+    }
+
+    .toolbar-btn.active {
+      background: #28a745;
+    }
+
+    .toolbar-btn.add {
+      background: #28a745;
+    }
+
+    .toolbar-btn.danger {
+      background: #dc3545;
+    }
+
+    .toolbar-btn.file-input {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .empty-dashboard {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    .empty-content {
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .empty-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+    }
+
+    .empty-content h2 {
+      color: #1d1d1f;
+      margin-bottom: 12px;
+      font-size: 2rem;
+    }
+
+    .empty-content p {
+      color: #666;
+      font-size: 1.1rem;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .add-first-widget-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .add-first-widget-btn:hover {
+      background: #218838;
+      transform: translateY(-2px);
+    }
+
+    .widgets-grid {
+      flex: 1;
+      padding: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      overflow-y: auto;
+      align-content: flex-start;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-toolbar {
+        flex-direction: column;
+        gap: 16px;
+        align-items: stretch;
+      }
+      
+      .toolbar-left,
+      .toolbar-right {
+        justify-content: center;
+      }
+      
+      .dashboard-stats {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      
+      .toolbar-right {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      
+      .widgets-grid {
+        padding: 16px;
+        gap: 12px;
+      }
+    }
+  `;
+}
